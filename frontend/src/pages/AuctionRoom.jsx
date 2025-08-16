@@ -139,6 +139,29 @@ const AuctionRoom = () => {
         }
       });
 
+      // Listen for auction state changes (e.g., scheduled -> active)
+      socketService.onAuctionEvent('auction_state', (data) => {
+        if (!data) return;
+        if (String(data.auctionId) === String(id)) {
+          // Update status
+          setAuction(prev => ({
+            ...prev,
+            status: data.status || 'active',
+            currentHighestBid: data.currentHighest?.amount ?? prev?.currentHighestBid,
+          }));
+
+          // If server provided countdown seconds, set a computed endTime
+          if (data.countdown && Number(data.countdown) > 0) {
+            const end = new Date(Date.now() + Number(data.countdown) * 1000).toISOString();
+            setAuction(prev => ({ ...prev, endTime: end }));
+          }
+
+          if (data.status === 'active') {
+            notificationService.auctionStarting(auction?.itemName || 'The auction');
+          }
+        }
+      });
+
       // Listen for the seller's final decision
       socketService.onAuctionEvent('seller_decision', (data) => {
         if (data.auctionId === parseInt(id)) {
