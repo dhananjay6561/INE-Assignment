@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import notificationService from '../services/notifications';
+import socketService from '../services/socket';
 
 const NotificationsPane = ({ className = '' }) => {
   const [notifications, setNotifications] = useState([]);
@@ -16,9 +17,40 @@ const NotificationsPane = ({ className = '' }) => {
       unsubscribe = notificationService.addListener((newNotifications) => {
         setNotifications(newNotifications);
       });
+
+      // Subscribe to global socket events so notifications inbox updates regardless of current page
+      socketService.onAuctionEvent('seller_decision', (data) => {
+        if (!data) return;
+        // Add local persistent message for quick visibility
+        if (data.decision === 'accepted') {
+          notificationService.addPersistent(`Your bid of ${data.amount} was accepted on auction ${data.auctionId}`, 'success');
+        } else if (data.decision === 'rejected') {
+          notificationService.addPersistent(`Your bid of ${data.amount} was rejected on auction ${data.auctionId}`, 'warning');
+        }
+        // Refresh server-side inbox
+        notificationService.fetchFromServer().catch(() => {});
+      });
+
+      socketService.onAuctionEvent('auction_ended', (data) => {
+        if (!data) return;
+        notificationService.addPersistent(`Auction ${data.auctionId} ended`, 'info');
+        notificationService.fetchFromServer().catch(() => {});
+      });
+
+      socketService.onAuctionEvent('new_bid', (data) => {
+        if (!data) return;
+        // Notify seller/bidders in inbox
+        notificationService.addPersistent(`New bid on auction ${data.auctionId}: ${data.amount} by ${data.bidder?.name || data.bidder?.id}`, 'info');
+        notificationService.fetchFromServer().catch(() => {});
+      });
     })();
 
-    return () => { if (unsubscribe) unsubscribe(); };
+    return () => {
+      if (unsubscribe) unsubscribe();
+      socketService.offAuctionEvent('seller_decision');
+      socketService.offAuctionEvent('auction_ended');
+      socketService.offAuctionEvent('new_bid');
+    };
   }, []);
 
   const removeNotification = (id) => {
@@ -83,9 +115,7 @@ const NotificationsPane = ({ className = '' }) => {
     return `${seconds}s ago`;
   };
 
-  if (notifications.length === 0) {
-    return null;
-  }
+  // Always render the notifications button; the dropdown will show a placeholder if there are none
 
   return (
     <div className={`relative ${className}`}>
@@ -121,30 +151,42 @@ const NotificationsPane = ({ className = '' }) => {
           </div>
           
           <div className="p-2">
-            {notifications.map((notification) => (
-              <div
-                key={notification.id}
-                className={`p-3 rounded-lg border mb-2 ${getNotificationStyle(notification.type)}`}
-              >
-                <div className="flex items-start space-x-3">
-                  <div className="flex-shrink-0 mt-0.5">
-                    {getNotificationIcon(notification.type)}
+            {notifications.length === 0 ? (
+              <div className="p-4 text-center text-sm text-gray-500">No notifications</div>
+            ) : (
+              notifications.map((notification) => (
+                <div
+                  key={notification.id}
+                  className={`p-3 rounded-lg border mb-2 ${getNotificationStyle(notification.type)}`}
+                >
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      {getNotificationIcon(notification.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm ${notification.read ? 'text-gray-500 line-through' : 'text-gray-800'}`}>{notification.message}</p>
+                      <p className="text-xs text-gray-500 mt-1">{formatTime(notification.timestamp)}</p>
+                    </div>
+                    <div className="flex flex-col items-end space-y-1">
+                      {!notification.read && (
+                        <button
+                          onClick={() => removeNotification(notification.id)}
+                          className="text-sm text-indigo-600 hover:underline"
+                        >
+                          Mark read
+                        </button>
+                      )}
+                      <button
+                        onClick={() => notificationService.clearAll()}
+                        className="text-xs text-gray-400 hover:text-gray-600"
+                      >
+                        Clear all
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-800">{notification.message}</p>
-                    <p className="text-xs text-gray-500 mt-1">{formatTime(notification.timestamp)}</p>
-                  </div>
-                  <button
-                    onClick={() => removeNotification(notification.id)}
-                    className="flex-shrink-0 text-gray-400 hover:text-gray-600"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       )}

@@ -113,6 +113,8 @@ const AuctionRoom = () => {
             bidCount: (prev?.bidCount || 0) + 1
           }));
           notificationService.newBid(auction?.itemName || 'the auction', data.amount);
+          // Refresh persistent notifications from server (so inbox shows this event)
+          notificationService.fetchFromServer().catch(() => {});
         }
       });
 
@@ -122,6 +124,8 @@ const AuctionRoom = () => {
         if (String(data.auctionId) === String(id) && data.newHighest && data.newHighest.bidderId !== currentUser.id) {
           // If current user was the previous highest, they will receive outbid
           notificationService.outbid(auction?.itemName || 'the auction', data.newHighest.amount);
+          // Refresh persistent notifications
+          notificationService.fetchFromServer().catch(() => {});
         }
       });
 
@@ -131,6 +135,8 @@ const AuctionRoom = () => {
         if (String(data.auctionId) === String(id)) {
           setAuction(prev => ({ ...prev, status: 'ended' }));
           notificationService.auctionEnded(auction?.itemName || 'The auction');
+          // Refresh persistent notifications
+          notificationService.fetchFromServer().catch(() => {});
           
           if (isSeller) {
             notificationService.sellerDecisionRequired(auction?.itemName || 'your auction');
@@ -164,9 +170,19 @@ const AuctionRoom = () => {
 
       // Listen for the seller's final decision
       socketService.onAuctionEvent('seller_decision', (data) => {
-        if (data.auctionId === parseInt(id)) {
+        if (!data) return;
+        if (String(data.auctionId) === String(id)) {
           setAuction(prev => ({ ...prev, decision: data.decision }));
           notificationService.info(`Seller has ${data.decision}ed the final bid.`);
+          // Add a persistent inbox notification for the bidder if this client is the bidder
+          const currentUserId = currentUser?.id;
+          if (currentUserId && data.amount && data.decision === 'accepted' && data.bidderId === currentUserId) {
+            notificationService.addPersistent(`Your bid of ${data.amount} was accepted.`,'success');
+          } else if (currentUserId && data.amount && data.decision === 'rejected' && data.bidderId === currentUserId) {
+            notificationService.addPersistent(`Your bid of ${data.amount} was rejected.`,'warning');
+          }
+          // Refresh persistent notifications (server-side) as well
+          notificationService.fetchFromServer().catch(() => {});
         }
       });
 

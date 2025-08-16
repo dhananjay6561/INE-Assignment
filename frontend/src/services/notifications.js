@@ -2,7 +2,7 @@ class NotificationService {
   constructor() {
     this.notifications = [];
     this.listeners = [];
-    this.maxNotifications = 5;
+  this.maxNotifications = 1000; // allow many persistent notifications
   }
 
   // Fetch persistent notifications from server
@@ -13,9 +13,9 @@ class NotificationService {
       // Try both exports
       const client = api.default || api;
       const response = await client.get('/notifications');
-      const serverNotifs = response.data?.notifications || [];
-      // Map to local shape
-      this.notifications = serverNotifs.map(n => ({ id: n.id, message: n.message, type: n.type, timestamp: n.created_at, duration: 0 }));
+  const serverNotifs = response.data?.notifications || [];
+  // Map to local shape including read flag
+  this.notifications = serverNotifs.map(n => ({ id: n.id, message: n.message, type: n.type, timestamp: n.created_at, duration: 0, read: !!n.read }));
       this.notifyListeners();
       return this.notifications;
     } catch (err) {
@@ -30,8 +30,9 @@ class NotificationService {
       const api = await import('./api');
       const client = api.default || api;
       await client.post(`/notifications/${id}/read`);
-      this.notifications = this.notifications.filter(n => n.id !== id);
-      this.notifyListeners();
+  // Mark notification as read locally but keep it in the inbox
+  this.notifications = this.notifications.map(n => n.id === id ? { ...n, read: true } : n);
+  this.notifyListeners();
     } catch (err) {
       console.error('Failed to mark notification read', err);
     }
@@ -61,6 +62,22 @@ class NotificationService {
       }, duration);
     }
 
+    this.notifyListeners();
+    return notification.id;
+  }
+
+  // Add a persistent (inbox) notification locally - does not auto-remove
+  addPersistent(message, type = 'info') {
+    const notification = {
+      id: `local-${Date.now()}-${Math.random()}`,
+      message,
+      type,
+      timestamp: new Date(),
+      duration: 0
+    };
+
+    this.notifications.unshift(notification);
+    if (this.notifications.length > this.maxNotifications) this.notifications.pop();
     this.notifyListeners();
     return notification.id;
   }

@@ -93,9 +93,10 @@ exports.sellerDecision = async (req, res) => {
             // Notify winner via socket
           try {
             const { io } = require("../app");
-            io.to(`user:${highest.bidderId}`).emit("seller_decision", { auctionId, decision: "accepted", amount: highest.amount });
-            // Broadcast final result to auction room
-            io.to(`auction:${auctionId}`).emit("auction_result", { auctionId, result: "accepted", highest });
+            const payload = { auctionId, decision: "accepted", amount: highest.amount, bidderId: highest.bidderId };
+            io.to(`user:${highest.bidderId}`).emit("seller_decision", payload);
+            // Broadcast final result to auction room (include bidderId)
+            io.to(`auction:${auctionId}`).emit("auction_result", { auctionId, result: "accepted", highest, bidderId: highest.bidderId });
           } catch (err) {
             console.error("Failed to emit seller_decision to winner or auction_result:", err);
           }
@@ -130,8 +131,9 @@ exports.sellerDecision = async (req, res) => {
 
       const { io } = require("../app");
       try {
-        io.to(`user:${highest.bidderId}`).emit("seller_decision", { auctionId, decision: "rejected" });
-        io.to(`auction:${auctionId}`).emit("auction_result", { auctionId, result: "rejected", highest });
+        const payload = { auctionId, decision: "rejected", amount: highest.amount, bidderId: highest.bidderId };
+        io.to(`user:${highest.bidderId}`).emit("seller_decision", payload);
+        io.to(`auction:${auctionId}`).emit("auction_result", { auctionId, result: "rejected", highest, bidderId: highest.bidderId });
       } catch (err) {
         console.error("Failed to emit seller_decision to bidder or auction_result:", err);
       }
