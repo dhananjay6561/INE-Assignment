@@ -13,6 +13,7 @@ const authRoutes = require("./routes/authRoutes");
 const auctionRoutes = require("./routes/auctionRoutes");
 const bidRoutes = require("./routes/bidRoutes");
 const decisionRoutes = require("./routes/decisionRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 // Scheduler
 const { startScheduler } = require("./workers/scheduler");
@@ -37,8 +38,9 @@ app.use(express.json());
 // Routes
 app.use("/auth", authRoutes);
 app.use("/auctions", auctionRoutes);
-// app.use("/", bidRoutes);
 app.use("/", decisionRoutes);
+app.use("/", notificationRoutes);
+app.use("/", bidRoutes);
 
 app.get("/", (req, res) => {
   res.json({ 

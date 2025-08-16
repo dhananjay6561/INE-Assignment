@@ -63,6 +63,16 @@ exports.placeBid = async (req, res) => {
           auctionId,
           newHighest: { bidderId: userId, amount },
         });
+          // Persist outbid notification
+          try {
+            const { Notification } = require('../models');
+            await Notification.create({
+              userId: highest.bidderId,
+              type: 'outbid',
+              message: `You were outbid on auction ${auctionId}. New highest: ${amount}`,
+              meta: { auctionId, amount, newBidder: userId }
+            });
+          } catch (e) { console.error('Failed to create outbid notification', e); }
       }
 
       // Notify seller that a new bid has arrived
@@ -73,6 +83,16 @@ exports.placeBid = async (req, res) => {
             bidderId: userId,
             amount,
           });
+          // Persist seller notification
+          try {
+            const { Notification } = require('../models');
+            await Notification.create({
+              userId: auction.sellerId,
+              type: 'new_bid',
+              message: `New bid on your auction ${auctionId}: ${amount}`,
+              meta: { auctionId, amount, bidderId: userId }
+            });
+          } catch (e) { console.error('Failed to create seller notification', e); }
         }
       } catch (err) {
         console.error("Failed to notify seller via socket:", err);

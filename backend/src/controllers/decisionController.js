@@ -100,6 +100,13 @@ exports.sellerDecision = async (req, res) => {
             console.error("Failed to emit seller_decision to winner or auction_result:", err);
           }
 
+            // Persist notifications for buyer and seller
+            try {
+              const { Notification } = require('../models');
+              await Notification.create({ userId: highest.bidderId, type: 'accepted', message: `Your bid of ${highest.amount} on auction ${auctionId} was accepted`, meta: { auctionId, amount: highest.amount } });
+              await Notification.create({ userId: auction.sellerId, type: 'accepted_sent', message: `You accepted the bid of ${highest.amount} on auction ${auctionId}`, meta: { auctionId, amount: highest.amount } });
+            } catch (e) { console.error('Failed to persist accept notifications', e); }
+
         } catch (err) {
           console.error(`[ERROR] SendGrid or notification error for auction ${auctionId}:`, err.response?.body || err);
         }
@@ -128,6 +135,13 @@ exports.sellerDecision = async (req, res) => {
       } catch (err) {
         console.error("Failed to emit seller_decision to bidder or auction_result:", err);
       }
+
+      // Persist notifications for rejection
+      try {
+        const { Notification } = require('../models');
+        await Notification.create({ userId: highest.bidderId, type: 'rejected', message: `Your bid of ${highest.amount} on auction ${auctionId} was rejected`, meta: { auctionId, amount: highest.amount } });
+        await Notification.create({ userId: auction.sellerId, type: 'rejected_sent', message: `You rejected the highest bid of ${highest.amount} on auction ${auctionId}`, meta: { auctionId, amount: highest.amount } });
+      } catch (e) { console.error('Failed to persist reject notifications', e); }
     }
 
     res.json({ message: `Auction ${action}ed successfully` });

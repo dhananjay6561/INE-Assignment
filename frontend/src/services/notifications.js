@@ -5,6 +5,38 @@ class NotificationService {
     this.maxNotifications = 5;
   }
 
+  // Fetch persistent notifications from server
+  async fetchFromServer() {
+    try {
+      const api = await import('./api');
+      const resp = await api.auctionAPI ? api.default.get('/notifications') : null;
+      // Try both exports
+      const client = api.default || api;
+      const response = await client.get('/notifications');
+      const serverNotifs = response.data?.notifications || [];
+      // Map to local shape
+      this.notifications = serverNotifs.map(n => ({ id: n.id, message: n.message, type: n.type, timestamp: n.created_at, duration: 0 }));
+      this.notifyListeners();
+      return this.notifications;
+    } catch (err) {
+      console.error('Failed to fetch notifications from server', err);
+      return [];
+    }
+  }
+
+  // Mark a notification read on server
+  async markRead(id) {
+    try {
+      const api = await import('./api');
+      const client = api.default || api;
+      await client.post(`/notifications/${id}/read`);
+      this.notifications = this.notifications.filter(n => n.id !== id);
+      this.notifyListeners();
+    } catch (err) {
+      console.error('Failed to mark notification read', err);
+    }
+  }
+
   // Add a new notification
   addNotification(message, type = 'info', duration = 5000) {
     const notification = {

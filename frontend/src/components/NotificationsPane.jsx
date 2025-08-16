@@ -6,15 +6,23 @@ const NotificationsPane = ({ className = '' }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = notificationService.addListener((newNotifications) => {
-      setNotifications(newNotifications);
-    });
+    let unsubscribe = null;
+    (async () => {
+      // Fetch server notifications first (if authenticated)
+      try {
+        await notificationService.fetchFromServer();
+      } catch (e) { /* ignore */ }
 
-    return unsubscribe;
+      unsubscribe = notificationService.addListener((newNotifications) => {
+        setNotifications(newNotifications);
+      });
+    })();
+
+    return () => { if (unsubscribe) unsubscribe(); };
   }, []);
 
   const removeNotification = (id) => {
-    notificationService.removeNotification(id);
+  notificationService.markRead(id);
   };
 
   const clearAll = () => {
