@@ -37,7 +37,7 @@ app.use(express.json());
 // Routes
 app.use("/auth", authRoutes);
 app.use("/auctions", auctionRoutes);
-app.use("/", bidRoutes);
+// app.use("/", bidRoutes);
 app.use("/", decisionRoutes);
 
 app.get("/", (req, res) => {

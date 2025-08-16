@@ -45,21 +45,21 @@ class SocketService {
       return;
     }
 
-    // Leave previous room if any
+    // Leave previous room if any (best effort)
     if (this.currentRoom) {
-      this.socket.emit('leave_room', this.currentRoom);
+      try { this.socket.emit('leave_auction', this.currentRoom); } catch (e) { /* ignore */ }
     }
 
-    // Join new auction room
-    this.currentRoom = `auction:${auctionId}`;
-    this.socket.emit('join_room', this.currentRoom);
-    console.log(`Joined auction room: ${this.currentRoom}`);
+    // Join new auction room using server's expected event
+    this.currentRoom = auctionId;
+    this.socket.emit('join_auction', auctionId);
+    console.log(`Joined auction room: auction:${auctionId}`);
   }
 
   // Leave current auction room
   leaveAuctionRoom() {
     if (this.socket && this.currentRoom) {
-      this.socket.emit('leave_room', this.currentRoom);
+      try { this.socket.emit('leave_auction', this.currentRoom); } catch (e) { /* ignore */ }
       this.currentRoom = null;
       console.log('Left auction room');
     }

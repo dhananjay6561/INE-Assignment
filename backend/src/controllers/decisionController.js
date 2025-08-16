@@ -30,8 +30,8 @@ exports.sellerDecision = async (req, res) => {
       return res.status(400).json({ error: "Invalid action" });
     }
 
-    let highest = await redis.get(`auction:${auctionId}:highest`);
-    highest = highest ? JSON.parse(highest) : null;
+    let highestRaw = await redis.get(`auction:${auctionId}:highest`);
+    const highest = highestRaw ? JSON.parse(highestRaw) : null;
 
     if (!highest) {
       auction.status = "closed_no_winner";
@@ -43,7 +43,10 @@ exports.sellerDecision = async (req, res) => {
     if (action === "accept") {
       auction.status = "accepted";
       await auction.save();
-      console.log(`[INFO] Auction ${auctionId} accepted. Generating invoice.`);
+      // persist status to Redis and cleanup highest bid
+      try { await redis.set(`auction:${auctionId}:status`, auction.status); } catch (e) { console.error('Failed to set redis status', e); }
+      try { await redis.del(`auction:${auctionId}:highest`); } catch (e) { /* non-fatal */ }
+      console.log(`[INFO] Auction ${auctionId} accepted. Generating invoice for bidder ${highest.bidderId} at amount ${highest.amount}.`);
 
       const doc = new PDFDocument();
       let buffers = [];
@@ -53,36 +56,52 @@ exports.sellerDecision = async (req, res) => {
         console.log(`[INFO] PDF invoice generated for auction ${auctionId}`);
 
         try {
-          const winnerBid = auction.bids[auction.bids.length-1];
-          const buyer = await User.findByPk(winnerBid.bidderId);
-          const buyerEmail = buyer.email;
+          // Find buyer using highest.bidderId
+          const buyer = await User.findByPk(highest.bidderId);
+          const buyerEmail = buyer?.email;
           const sellerEmail = req.user.email;
 
-          console.log(`[INFO] Sending email to buyer: ${buyerEmail} and seller: ${sellerEmail}`);
+          if (!buyerEmail) {
+            console.error(`[ERROR] Buyer email not found for bidderId=${highest.bidderId}`);
+          } else {
+            console.log(`[INFO] Sending email to buyer: ${buyerEmail} and seller: ${sellerEmail}`);
 
-          const msgBuyer = {
-            to: buyerEmail,
-            from: VERIFIED_SENDER,
-            subject: `Auction Accepted: ${auction.itemName}`,
-            text: `Congratulations! You won the auction.`,
-            attachments: [{ content: pdfData.toString("base64"), filename: "invoice.pdf", type: "application/pdf", disposition: "attachment" }],
-          };
+            const attachment = { content: pdfData.toString("base64"), filename: "invoice.pdf", type: "application/pdf", disposition: "attachment" };
 
-          const msgSeller = {
-            to: sellerEmail,
-            from: VERIFIED_SENDER,
-            subject: `Auction Accepted: ${auction.itemName}`,
-            text: `You accepted the bid.`,
-            attachments: [{ content: pdfData.toString("base64"), filename: "invoice.pdf", type: "application/pdf", disposition: "attachment" }],
-          };
+            const msgBuyer = {
+              to: buyerEmail,
+              from: VERIFIED_SENDER,
+              subject: `Auction Accepted: ${auction.itemName}`,
+              text: `Congratulations! You won the auction.`,
+              attachments: [attachment],
+            };
 
-          await sgMail.send(msgBuyer);
-          console.log(`[SUCCESS] Email sent to buyer: ${buyerEmail}`);
-          await sgMail.send(msgSeller);
-          console.log(`[SUCCESS] Email sent to seller: ${sellerEmail}`);
+            const msgSeller = {
+              to: sellerEmail,
+              from: VERIFIED_SENDER,
+              subject: `Auction Accepted: ${auction.itemName}`,
+              text: `You accepted the bid.`,
+              attachments: [attachment],
+            };
+
+            await sgMail.send(msgBuyer);
+            console.log(`[SUCCESS] Email sent to buyer: ${buyerEmail}`);
+            await sgMail.send(msgSeller);
+            console.log(`[SUCCESS] Email sent to seller: ${sellerEmail}`);
+          }
+
+            // Notify winner via socket
+          try {
+            const { io } = require("../app");
+            io.to(`user:${highest.bidderId}`).emit("seller_decision", { auctionId, decision: "accepted", amount: highest.amount });
+            // Broadcast final result to auction room
+            io.to(`auction:${auctionId}`).emit("auction_result", { auctionId, result: "accepted", highest });
+          } catch (err) {
+            console.error("Failed to emit seller_decision to winner or auction_result:", err);
+          }
 
         } catch (err) {
-          console.error(`[ERROR] SendGrid error for auction ${auctionId}:`, err.response?.body || err);
+          console.error(`[ERROR] SendGrid or notification error for auction ${auctionId}:`, err.response?.body || err);
         }
       });
 
@@ -96,10 +115,19 @@ exports.sellerDecision = async (req, res) => {
     } else if (action === "reject") {
       auction.status = "rejected";
       await auction.save();
+      // persist status and cleanup
+      try { await redis.set(`auction:${auctionId}:status`, auction.status); } catch (e) { console.error('Failed to set redis status', e); }
+      try { await redis.del(`auction:${auctionId}:highest`); } catch (e) { /* non-fatal */ }
+
       console.log(`[INFO] Auction ${auctionId} rejected`);
 
       const { io } = require("../app");
-      io.to(`user:${highest.bidderId}`).emit("seller_decision", { auctionId, decision: "rejected" });
+      try {
+        io.to(`user:${highest.bidderId}`).emit("seller_decision", { auctionId, decision: "rejected" });
+        io.to(`auction:${auctionId}`).emit("auction_result", { auctionId, result: "rejected", highest });
+      } catch (err) {
+        console.error("Failed to emit seller_decision to bidder or auction_result:", err);
+      }
     }
 
     res.json({ message: `Auction ${action}ed successfully` });

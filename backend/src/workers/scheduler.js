@@ -38,19 +38,37 @@ const startScheduler = async (io) => {
             const auction = await Auction.findByPk(auctionId);
             if (!auction || auction.status !== "active") continue;
 
-            auction.status = "ended";
+            // Move to decision_pending so seller must accept/reject
+            auction.status = "decision_pending";
             await auction.save();
-            await redis.set(`auction:${auctionId}:status`, "ended");
+            await redis.set(`auction:${auctionId}:status`, "decision_pending");
             await redis.zrem("auction:schedule:ends", auctionId);
 
-            console.log(`Auction ${auctionId} ended`);
+            console.log(`Auction ${auctionId} moved to decision_pending`);
 
             if (io) {
-                const highest = await redis.get(`auction:${auctionId}:highest`);
+                const highestRaw = await redis.get(`auction:${auctionId}:highest`);
+                const highest = highestRaw ? JSON.parse(highestRaw) : null;
+
+                // Broadcast to auction room that auction ended and decision is required
                 io.to(`auction:${auctionId}`).emit("auction_ended", {
                     auctionId: auction.id,
-                    highestBid: highest ? JSON.parse(highest) : null,
+                    highestBid: highest,
+                    decisionRequired: true,
                 });
+
+                // Notify seller directly that their action is required
+                if (auction.sellerId && highest) {
+                    io.to(`user:${auction.sellerId}`).emit("seller_action_required", {
+                        auctionId: auction.id,
+                        highestBid: highest,
+                    });
+                } else if (auction.sellerId) {
+                    io.to(`user:${auction.sellerId}`).emit("seller_action_required", {
+                        auctionId: auction.id,
+                        highestBid: null,
+                    });
+                }
             }
         }
     }, POLL_INTERVAL);

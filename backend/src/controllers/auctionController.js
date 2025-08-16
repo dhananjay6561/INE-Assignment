@@ -44,8 +44,66 @@ exports.getAuction = async (req, res) => {
     const auction = await Auction.findByPk(req.params.id);
     if (!auction) return res.status(404).json({ error: "Auction not found" });
 
-    res.json({ auction });
+    // Enrich auction payload with computed fields for frontend
+    const highestRaw = await redis.get(`auction:${auction.id}:highest`);
+    const highest = highestRaw ? JSON.parse(highestRaw) : null;
+
+    // Seller info (if available)
+    let seller = null;
+    try {
+      const { User } = require('../models');
+      if (auction.sellerId) {
+        seller = await User.findByPk(auction.sellerId, { attributes: ['id', 'name', 'email'] });
+      }
+    } catch (e) { /* ignore */ }
+
+    // Highest bidder details
+    let highestBidder = null;
+    if (highest && highest.bidderId) {
+      try {
+        const { User } = require('../models');
+        highestBidder = await User.findByPk(highest.bidderId, { attributes: ['id', 'name', 'email'] });
+      } catch (e) { /* ignore */ }
+    }
+
+    // Compute end time if goLiveAt + durationSeconds available
+    let endTime = null;
+    try {
+      if (auction.goLiveAt && auction.durationSeconds) {
+        const start = new Date(auction.goLiveAt).getTime();
+        endTime = new Date(start + (auction.durationSeconds * 1000)).toISOString();
+      }
+    } catch (e) { /* ignore */ }
+
+    // Bid count
+    let bidCount = 0;
+    try {
+      const { Bid } = require('../models');
+      bidCount = await Bid.count({ where: { auctionId: auction.id } });
+    } catch (e) { /* ignore */ }
+
+    const payload = {
+      id: auction.id,
+      sellerId: auction.sellerId,
+      seller,
+      itemName: auction.itemName,
+      description: auction.description,
+      startingPrice: auction.startingPrice,
+      bidIncrement: auction.bidIncrement,
+      goLiveAt: auction.goLiveAt,
+      durationSeconds: auction.durationSeconds,
+      status: auction.status,
+      created_at: auction.created_at,
+      updated_at: auction.updated_at,
+      currentHighestBid: highest ? highest.amount : null,
+      currentHighestBidder: highestBidder || null,
+      endTime,
+      bidCount,
+    };
+
+    res.json({ auction: payload });
   } catch (err) {
+    console.error('Failed to fetch auction:', err);
     res.status(500).json({ error: "Failed to fetch auction" });
   }
 };

@@ -43,12 +43,16 @@ export const authAPI = {
 };
 
 // Auction endpoints
+// Auction endpoints
 export const auctionAPI = {
   getAll: (status) => api.get(`/auctions?status=${status}`),
   getById: (id) => api.get(`/auctions/${id}`),
   create: (auctionData) => api.post('/auctions', auctionData),
   placeBid: (auctionId, bidAmount) => api.post(`/auctions/${auctionId}/bids`, { amount: bidAmount }),
-  makeDecision: (auctionId, decision) => api.post(`/auctions/${auctionId}/decision`, { decision }),
+
+  // Fix: match backend key 'action'
+  makeDecision: (auctionId, decision) =>
+    api.post(`/auctions/${auctionId}/decision`, { action: decision }),
 };
 
 export default api;

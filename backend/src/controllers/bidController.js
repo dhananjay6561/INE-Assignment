@@ -38,15 +38,24 @@ exports.placeBid = async (req, res) => {
     const minBid = highest ? highest.amount + auction.bidIncrement : auction.startingPrice;
     if (amount < minBid) return res.status(400).json({ error: `Minimum bid is ${minBid}` });
 
-    // Update Redis with new highest bid
-    await redis.set(highestKey, JSON.stringify({ amount, bidderId: userId }));
+  // Update Redis with new highest bid (include timestamp)
+  const highestObj = { amount, bidderId: userId, time: Date.now() };
+  await redis.set(highestKey, JSON.stringify(highestObj));
 
     // Persist bid to DB
     await auction.createBid({ bidderId: userId, amount });
 
     // Broadcast new bid to auction room
     if (ioInstance) {
-      ioInstance.to(`auction:${auctionId}`).emit("new_bid", { bidderId: userId, amount, time: new Date() });
+      // Fetch bidder details for socket payload
+      let bidder = { id: userId };
+      try {
+        const { User } = require('../models');
+        const u = await User.findByPk(userId, { attributes: ['id', 'name'] });
+        if (u) bidder = { id: u.id, name: u.name };
+      } catch (e) { /* ignore */ }
+
+      ioInstance.to(`auction:${auctionId}`).emit("new_bid", { auctionId, bidder, amount, time: new Date() });
 
       // Notify previous highest bidder (if exists)
       if (highest && highest.bidderId !== userId) {
@@ -54,6 +63,19 @@ exports.placeBid = async (req, res) => {
           auctionId,
           newHighest: { bidderId: userId, amount },
         });
+      }
+
+      // Notify seller that a new bid has arrived
+      try {
+        if (auction.sellerId && auction.sellerId !== userId) {
+          ioInstance.to(`user:${auction.sellerId}`).emit("seller_new_bid", {
+            auctionId,
+            bidderId: userId,
+            amount,
+          });
+        }
+      } catch (err) {
+        console.error("Failed to notify seller via socket:", err);
       }
     }
 

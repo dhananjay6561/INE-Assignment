@@ -99,7 +99,8 @@ const AuctionRoom = () => {
 
       // Listen for new bids
       socketService.onAuctionEvent('new_bid', (data) => {
-        if (data.auctionId === parseInt(id)) {
+        if (!data) return;
+        if (String(data.auctionId) === String(id)) {
           setAuction(prev => ({
             ...prev,
             currentHighestBid: data.amount,
@@ -112,14 +113,17 @@ const AuctionRoom = () => {
 
       // Listen for outbid notifications
       socketService.onAuctionEvent('outbid', (data) => {
-        if (data.auctionId === parseInt(id) && data.userId === currentUser.id) {
-          notificationService.outbid(auction?.itemName || 'the auction', data.amount);
+        if (!data) return;
+        if (String(data.auctionId) === String(id) && data.newHighest && data.newHighest.bidderId !== currentUser.id) {
+          // If current user was the previous highest, they will receive outbid
+          notificationService.outbid(auction?.itemName || 'the auction', data.newHighest.amount);
         }
       });
 
       // Listen for the auction ending
       socketService.onAuctionEvent('auction_ended', (data) => {
-        if (data.auctionId === parseInt(id)) {
+        if (!data) return;
+        if (String(data.auctionId) === String(id)) {
           setAuction(prev => ({ ...prev, status: 'ended' }));
           notificationService.auctionEnded(auction?.itemName || 'The auction');
           
@@ -331,17 +335,27 @@ const AuctionRoom = () => {
           {/* Right Column - Bidding & Status */}
           <div className="space-y-6">
             {/* Bid Input appears only for active auctions and non-sellers */}
-            {auction.status === 'active' && !isSeller && !isAuctionEnded && (
-              <div className="card">
-                <BidInput
-                  currentHighestBid={auction.currentHighestBid || auction.startingPrice}
-                  bidIncrement={auction.bidIncrement}
-                  onPlaceBid={handlePlaceBid}
-                  isLoading={isPlacingBid}
-                  disabled={auction.status !== 'active'}
-                />
-              </div>
-            )}
+              {auction.status === 'active' && !isSeller && !isAuctionEnded ? (
+                <div className="card">
+                  <BidInput
+                    currentHighestBid={auction.currentHighestBid || auction.startingPrice}
+                    bidIncrement={auction.bidIncrement}
+                    onPlaceBid={handlePlaceBid}
+                    isLoading={isPlacingBid}
+                    disabled={auction.status !== 'active'}
+                  />
+                </div>
+              ) : (
+                <div className="card bg-gray-50 text-sm text-gray-600 p-4">
+                  {auction.status !== 'active' ? (
+                    <p>Bidding is not open. Current auction status: <strong>{getStatusDisplay(auction.status)}</strong>.</p>
+                  ) : isSeller ? (
+                    <p>Sellers cannot place bids on their own auction.</p>
+                  ) : (
+                    <p>You must be logged in as a buyer to place bids.</p>
+                  )}
+                </div>
+              )}
             
             <div className="card">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Auction Information</h3>
