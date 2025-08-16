@@ -6,13 +6,18 @@ require("dotenv").config();
 
 const User = require("./models/User");
 const Auction = require("./models/Auction");
+const Bid = require("./models/Bid");
 
 const authRoutes = require("./routes/authRoutes");
 const auctionRoutes = require("./routes/auctionRoutes");
 const bidRoutes = require("./routes/bidRoutes");
+const decisionRoutes = require("./routes/decisionRoutes");
 
-// Scheduler placeholder
+// Scheduler
 const { startScheduler } = require("./workers/scheduler");
+
+// BidController to inject io
+const bidController = require("./controllers/bidController");
 
 const app = express();
 app.use(express.json());
@@ -20,7 +25,8 @@ app.use(express.json());
 // Routes
 app.use("/auth", authRoutes);
 app.use("/auctions", auctionRoutes);
-app.use("/bids", bidRoutes);
+app.use("/", bidRoutes);
+app.use("/", decisionRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "Auction platform backend running" });
@@ -28,13 +34,15 @@ app.get("/", (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-// Create HTTP server and integrate Socket.IO
+// HTTP server + Socket.IO
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] }
+  cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
-// Socket.IO logic
+// Inject io into bidController
+bidController.setIo(io);
+
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
@@ -48,19 +56,19 @@ io.on("connection", (socket) => {
   });
 });
 
-// Initialize DB + start scheduler
+// DB init + scheduler
 (async () => {
   try {
     await sequelize.authenticate();
     console.log("DB connected");
 
-    await sequelize.sync();
-    console.log("Models synced");
+    // Uncomment in dev to drop & recreate tables
+    // await sequelize.sync({ force: true }); 
+    // console.log("All models synced & tables recreated");
 
-    // Start scheduler after DB is ready
-    startScheduler();
+    // Start scheduler with Socket.IO reference
+    startScheduler(io);
 
-    // Start server
     server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   } catch (error) {
     console.error("DB connection failed:", error);

@@ -1,10 +1,9 @@
 const redis = require("../config/redis");
 const Auction = require("../models/Auction");
-const { io } = require("../app"); // import io from app.js
 
 const POLL_INTERVAL = 5000; // 5 sec
 
-const startScheduler = async () => {
+const startScheduler = async (io) => {
     console.log("Scheduler started");
 
     setInterval(async () => {
@@ -18,19 +17,19 @@ const startScheduler = async () => {
 
             auction.status = "active";
             await auction.save();
-
             await redis.set(`auction:${auctionId}:status`, "active");
             await redis.zrem("auction:schedule:starts", auctionId);
 
             console.log(`Auction ${auctionId} started`);
 
-            // Socket event: notify all clients in room
-            io.to(`auction:${auctionId}`).emit("auction_state", {
-                auctionId: auction.id,
-                status: "active",
-                currentHighest: null, // will populate later with Redis
-                countdown: auction.durationSeconds,
-            });
+            if (io) {
+                io.to(`auction:${auctionId}`).emit("auction_state", {
+                    auctionId: auction.id,
+                    status: "active",
+                    currentHighest: null,
+                    countdown: auction.durationSeconds,
+                });
+            }
         }
 
         // --- End Auctions ---
@@ -41,20 +40,19 @@ const startScheduler = async () => {
 
             auction.status = "ended";
             await auction.save();
-
             await redis.set(`auction:${auctionId}:status`, "ended");
             await redis.zrem("auction:schedule:ends", auctionId);
 
             console.log(`Auction ${auctionId} ended`);
 
-            // Socket event: notify all clients in room
-            const highest = await redis.get(`auction:${auctionId}:highest`);
-            io.to(`auction:${auctionId}`).emit("auction_ended", {
-                auctionId: auction.id,
-                highestBid: highest ? JSON.parse(highest) : null,
-            });
+            if (io) {
+                const highest = await redis.get(`auction:${auctionId}:highest`);
+                io.to(`auction:${auctionId}`).emit("auction_ended", {
+                    auctionId: auction.id,
+                    highestBid: highest ? JSON.parse(highest) : null,
+                });
+            }
         }
-
     }, POLL_INTERVAL);
 };
 

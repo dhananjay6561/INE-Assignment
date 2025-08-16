@@ -1,10 +1,9 @@
 const express = require("express");
-const { placeBid } = require("../controllers/bidController");
+const { sellerDecision } = require("../controllers/decisionController");
 const authMiddleware = require("../middlewares/authMiddleware");
 
 const router = express.Router();
 
-// Place bid on auction
-router.post("/:auctionId/bids", authMiddleware, placeBid);
+router.post("/auctions/:auctionId/decision", authMiddleware, sellerDecision);
 
 module.exports = router;
