@@ -43,6 +43,11 @@ const AuctionRoom = () => {
     }
     
     return () => {
+      // Clean up socket listeners and disconnect
+      socketService.offAuctionEvent('new_bid');
+      socketService.offAuctionEvent('outbid');
+      socketService.offAuctionEvent('auction_ended');
+      socketService.offAuctionEvent('seller_decision');
       socketService.disconnect();
     };
   }, [id]);

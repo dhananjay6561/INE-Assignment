@@ -5,6 +5,8 @@ class SocketService {
     this.socket = null;
     this.connected = false;
     this.currentRoom = null;
+  this.pendingRoom = null;
+  this._listeners = {}; // map event -> array of wrappers
   }
 
   // Initialize socket connection
@@ -23,6 +25,17 @@ class SocketService {
     this.socket.on('connect', () => {
       console.log('Socket connected');
       this.connected = true;
+      // If a room was requested before connect, auto-join it now
+      if (this.pendingRoom) {
+        try {
+          this.socket.emit('join_auction', this.pendingRoom);
+          this.currentRoom = this.pendingRoom;
+          console.log(`Auto-joined pending auction room: auction:${this.pendingRoom}`);
+        } catch (e) {
+          console.error('Failed to auto-join pending room', e);
+        }
+        this.pendingRoom = null;
+      }
     });
 
     this.socket.on('disconnect', () => {
@@ -40,12 +53,21 @@ class SocketService {
 
   // Join auction room
   joinAuctionRoom(auctionId) {
-    if (!this.socket || !this.connected) {
-      console.error('Socket not connected');
+    // If socket not initialized yet, remember the requested room and attempt to join when connected
+    if (!this.socket) {
+      console.error('Socket not initialized');
+      this.pendingRoom = auctionId;
       return;
     }
 
-    // Leave previous room if any (best effort)
+    if (!this.connected) {
+      // Save desired room and wait for connect event to auto-join
+      this.pendingRoom = auctionId;
+      console.log(`Socket not connected yet; pending join for auction:${auctionId}`);
+      return;
+    }
+
+    // Leave previous room if any
     if (this.currentRoom) {
       try { this.socket.emit('leave_auction', this.currentRoom); } catch (e) { /* ignore */ }
     }
@@ -68,13 +90,32 @@ class SocketService {
   // Listen to auction events
   onAuctionEvent(event, callback) {
     if (!this.socket) return;
-    this.socket.on(event, callback);
+    const wrapper = (data) => {
+      try {
+        console.debug(`Socket event received: ${event}`, data);
+      } catch (e) { /* ignore */ }
+      try { callback(data); } catch (err) { console.error('Listener callback error', err); }
+    };
+
+    this.socket.on(event, wrapper);
+    if (!this._listeners[event]) this._listeners[event] = [];
+    this._listeners[event].push(wrapper);
   }
 
   // Remove event listener
   offAuctionEvent(event, callback) {
     if (!this.socket) return;
-    this.socket.off(event, callback);
+    // If callback provided, try to remove matching wrapper
+    if (callback && this._listeners[event]) {
+      // find wrapper(s) that call the provided callback is not trivial, so remove all
+      this.socket.off(event);
+      this._listeners[event] = [];
+      return;
+    }
+
+    // No callback provided -> remove all wrappers for the event
+    this.socket.off(event);
+    this._listeners[event] = [];
   }
 
   // Emit bid
