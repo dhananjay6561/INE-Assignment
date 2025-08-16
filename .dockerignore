@@ -1,0 +1,25 @@
+# Node modules
+node_modules
+frontend/node_modules
+backend/node_modules
+
+# Build outputs
+dist
+frontend/dist
+
+# Logs
+*.log
+npm-debug.log
+
+#Environmentfiles
+.env
+**/.env
+
+# IDE/editor settings
+.vscode
+
+# OS-specific files
+.DS_Store
+
+# Git folder
+.git
