@@ -6,12 +6,12 @@ exports.signup = async (req, res) => {
     const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
-      return res.status(400).json({ error: "All fields are required" });
+      return res.status(400).json({ message: "All fields are required" });
     }
 
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ error: "Email already registered" });
+      return res.status(400).json({ message: "Email already registered" });
     }
 
     const user = await User.create({ name, email, passwordHash: password });
@@ -23,34 +23,44 @@ exports.signup = async (req, res) => {
       user: { id: user.id, name: user.name, email: user.email }
     });
   } catch (err) {
-    res.status(500).json({ error: "Signup failed" });
+    console.error('Signup error:', err);
+    res.status(500).json({ message: "Signup failed" });
   }
 };
 
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    
+    // Add debug logging
+    console.log('Login attempt:', { email, passwordProvided: !!password });
+    
     if (!email || !password) {
-      return res.status(400).json({ error: "Email and password required" });
+      return res.status(400).json({ message: "Email and password required" });
     }
 
     const user = await User.findOne({ where: { email } });
     if (!user) {
-      return res.status(400).json({ error: "Invalid credentials" });
+      console.log('User not found:', email);
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
     const isValid = await user.validatePassword(password);
     if (!isValid) {
-      return res.status(400).json({ error: "Invalid credentials" });
+      console.log('Invalid password for user:', email);
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
     const token = generateToken(user);
+    console.log('Login successful for user:', email);
+    
     res.json({ 
       message: "Login successful",
       token,
       user: { id: user.id, name: user.name, email: user.email }
     });
   } catch (err) {
-    res.status(500).json({ error: "Login failed" });
+    console.error('Login error:', err);
+    res.status(500).json({ message: "Login failed" });
   }
 };

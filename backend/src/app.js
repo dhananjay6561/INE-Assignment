@@ -1,4 +1,5 @@
 const express = require("express");
+const cors = require("cors");
 const http = require("http");
 const { Server } = require("socket.io");
 const sequelize = require("./config/database");
@@ -20,6 +21,17 @@ const { startScheduler } = require("./workers/scheduler");
 const bidController = require("./controllers/bidController");
 
 const app = express();
+
+// CORS Configuration
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
+const corsOptions = {
+  origin: FRONTEND_URL,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  credentials: true, // Enable if you need to send cookies/auth headers
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
@@ -29,7 +41,10 @@ app.use("/", bidRoutes);
 app.use("/", decisionRoutes);
 
 app.get("/", (req, res) => {
-  res.json({ message: "Auction platform backend running" });
+  res.json({ 
+    message: "Auction platform backend running",
+    frontendUrl: FRONTEND_URL
+  });
 });
 
 const PORT = process.env.PORT || 5000;
@@ -37,7 +52,11 @@ const PORT = process.env.PORT || 5000;
 // HTTP server + Socket.IO
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
+  cors: { 
+    origin: FRONTEND_URL, 
+    methods: ["GET", "POST"],
+    credentials: true
+  },
 });
 
 // Inject io into bidController
@@ -61,6 +80,7 @@ io.on("connection", (socket) => {
   try {
     await sequelize.authenticate();
     console.log("DB connected");
+    console.log(`CORS enabled for: ${FRONTEND_URL}`);
 
     // Uncomment in dev to drop & recreate tables
     // await sequelize.sync({ force: true }); 
