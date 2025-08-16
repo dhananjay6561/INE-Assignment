@@ -1,5 +1,6 @@
 const Auction = require("../models/Auction");
 const { Op } = require("sequelize");
+const redis = require("../config/redis"); // Redis client
 
 // Create auction
 exports.createAuction = async (req, res) => {
@@ -9,6 +10,7 @@ exports.createAuction = async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
+    // Create auction in DB
     const auction = await Auction.create({
       sellerId: req.user.id,
       itemName,
@@ -18,6 +20,16 @@ exports.createAuction = async (req, res) => {
       goLiveAt,
       durationSeconds,
     });
+
+    // --- Redis scheduling ---
+    const startTimestamp = Math.floor(new Date(goLiveAt).getTime() / 1000);
+    const endTimestamp = startTimestamp + durationSeconds;
+
+    await redis.zadd("auction:schedule:starts", Math.floor(new Date(goLiveAt).getTime() / 1000), auction.id);
+    await redis.zadd("auction:schedule:ends", Math.floor(new Date(goLiveAt).getTime() / 1000) + durationSeconds, auction.id);
+
+    await redis.set(`auction:${auction.id}:status`, "scheduled");
+    // ------------------------
 
     res.status(201).json({ message: "Auction created", auction });
   } catch (err) {
