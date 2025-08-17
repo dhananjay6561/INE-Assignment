@@ -108,15 +108,53 @@ exports.getAuction = async (req, res) => {
   }
 };
 
-// List auctions by status
+// List auctions by status, always include seller info and endTime
 exports.listAuctions = async (req, res) => {
   try {
     const { status } = req.query;
     let where = {};
     if (status) where.status = status;
 
-    const auctions = await Auction.findAll({ where, order: [["goLiveAt", "ASC"]] });
-    res.json({ auctions });
+    const { User } = require('../models');
+    // Eager load seller association
+    const auctions = await Auction.findAll({
+      where,
+      order: [["goLiveAt", "ASC"]],
+      include: [{ model: User, as: "seller", attributes: ["id", "name", "email"] }],
+    });
+
+    // For each auction, compute endTime robustly
+    const auctionsWithDetails = auctions.map((auction) => {
+      let endTime = null;
+      try {
+        if (auction.goLiveAt && auction.durationSeconds) {
+          const start = new Date(auction.goLiveAt).getTime();
+          endTime = new Date(start + (auction.durationSeconds * 1000)).toISOString();
+        }
+      } catch (e) { /* ignore */ }
+
+      return {
+        id: auction.id,
+        sellerId: auction.sellerId,
+        seller: auction.seller ? {
+          id: auction.seller.id,
+          name: auction.seller.name,
+          email: auction.seller.email
+        } : null,
+        itemName: auction.itemName,
+        description: auction.description,
+        startingPrice: auction.startingPrice,
+        bidIncrement: auction.bidIncrement,
+        goLiveAt: auction.goLiveAt,
+        durationSeconds: auction.durationSeconds,
+        status: auction.status,
+        created_at: auction.created_at,
+        updated_at: auction.updated_at,
+        endTime,
+      };
+    });
+
+    res.json({ auctions: auctionsWithDetails });
   } catch (err) {
     res.status(500).json({ error: "Failed to list auctions" });
   }

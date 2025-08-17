@@ -91,11 +91,18 @@ const AuctionCard = ({ auction }) => {
           </div>
         )}
         
-        {auction.status === 'active' && auction.endTime && (
+        {auction.status === 'active' && (
           <div className="bg-green-50 border border-green-200 rounded-lg p-3">
             <p className="text-sm text-green-700 font-medium mb-2">AUCTION ACTIVE - Ends in:</p>
             <CountdownTimer 
-              endTime={auction.endTime} 
+              endTime={(() => {
+                if (auction.endTime) return auction.endTime;
+                if (auction.goLiveAt && auction.durationSeconds) {
+                  const start = new Date(auction.goLiveAt).getTime();
+                  return new Date(start + (auction.durationSeconds * 1000)).toISOString();
+                }
+                return null;
+              })()}
               className="text-base"
               showExpiredAs="Auction ended"
             />
@@ -112,22 +119,13 @@ const AuctionCard = ({ auction }) => {
       <div className="flex justify-between items-center">
         <div className="text-sm text-gray-500">
           <p>Seller: {auction.seller?.name || 'Unknown'}</p>
-          <p>Bids: {auction.bidCount || 0}</p>
         </div>
-        
         <Link 
           to={`/auctions/${auction.id}`}
           className="btn-primary"
         >
           View Auction
         </Link>
-      </div>
-      
-      {/* Debug info - remove in production */}
-      <div className="mt-3 p-2 bg-gray-100 rounded text-xs text-gray-500">
-        <p>ID: {auction.id} | Status: {auction.status}</p>
-        <p>Go Live: {auction.goLiveAt ? new Date(auction.goLiveAt).toLocaleString() : 'Not set'}</p>
-        <p>End Time: {auction.endTime ? new Date(auction.endTime).toLocaleString() : 'Not set'}</p>
       </div>
     </div>
   );

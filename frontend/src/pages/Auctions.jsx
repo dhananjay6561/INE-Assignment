@@ -19,51 +19,50 @@ const Auctions = () => {
     try {
       setIsLoading(true);
       setError(null);
-      
       let response;
       if (filter === 'all') {
-        // Fetch both active and scheduled auctions
-        const [activeResponse, scheduledResponse] = await Promise.all([
+        // Fetch active, scheduled, and ended auctions
+        const [activeResponse, scheduledResponse, endedResponse] = await Promise.all([
           auctionAPI.getAll('active'),
-          auctionAPI.getAll('scheduled')
+          auctionAPI.getAll('scheduled'),
+          auctionAPI.getAll('ended')
         ]);
-        
-        // Safe array access - handle different response formats
-        const activeAuctions = Array.isArray(activeResponse.data) 
-          ? activeResponse.data 
-          : Array.isArray(activeResponse.data?.auctions) 
-            ? activeResponse.data.auctions 
+        const activeAuctions = Array.isArray(activeResponse.data)
+          ? activeResponse.data
+          : Array.isArray(activeResponse.data?.auctions)
+            ? activeResponse.data.auctions
             : [];
-            
-        const scheduledAuctions = Array.isArray(scheduledResponse.data) 
-          ? scheduledResponse.data 
-          : Array.isArray(scheduledResponse.data?.auctions) 
-            ? scheduledResponse.data.auctions 
+        const scheduledAuctions = Array.isArray(scheduledResponse.data)
+          ? scheduledResponse.data
+          : Array.isArray(scheduledResponse.data?.auctions)
+            ? scheduledResponse.data.auctions
             : [];
-        
+        const endedAuctions = Array.isArray(endedResponse.data)
+          ? endedResponse.data
+          : Array.isArray(endedResponse.data?.auctions)
+            ? endedResponse.data.auctions
+            : [];
         const combinedAuctions = [
           ...activeAuctions,
-          ...scheduledAuctions
+          ...scheduledAuctions,
+          ...endedAuctions
         ];
-        
-        // Sort by end time (active auctions first, then scheduled by start time)
+        // Sort: active > scheduled > ended, then by end/start time
         combinedAuctions.sort((a, b) => {
-          if (a.status === 'active' && b.status === 'scheduled') return -1;
-          if (a.status === 'scheduled' && b.status === 'active') return 1;
+          const statusOrder = { active: 0, scheduled: 1, ended: 2 };
+          if (statusOrder[a.status] !== statusOrder[b.status]) {
+            return statusOrder[a.status] - statusOrder[b.status];
+          }
           return new Date(a.endTime || a.startTime) - new Date(b.endTime || b.startTime);
         });
-        
         setAuctions(combinedAuctions);
       } else {
         response = await auctionAPI.getAll(filter);
-        
-        // Safe array access - handle different response formats
-        const auctionsData = Array.isArray(response.data) 
-          ? response.data 
-          : Array.isArray(response.data?.auctions) 
-            ? response.data.auctions 
+        const auctionsData = Array.isArray(response.data)
+          ? response.data
+          : Array.isArray(response.data?.auctions)
+            ? response.data.auctions
             : [];
-            
         setAuctions(auctionsData);
       }
     } catch (error) {
@@ -71,7 +70,6 @@ const Auctions = () => {
       const message = error.response?.data?.message || error.response?.data?.error || 'Failed to fetch auctions';
       setError(message);
       notificationService.error(message);
-      // Set empty array on error to prevent .map() issues
       setAuctions([]);
     } finally {
       setIsLoading(false);
@@ -135,7 +133,8 @@ const Auctions = () => {
               {[
                 { key: 'all', label: 'All Auctions' },
                 { key: 'active', label: 'Active' },
-                { key: 'scheduled', label: 'Scheduled' }
+                { key: 'scheduled', label: 'Scheduled' },
+                { key: 'ended', label: 'Ended' }
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -187,7 +186,7 @@ const Auctions = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {Array.isArray(auctions) && auctions.map((auction) => (
-              <AuctionCard key={auction.id} auction={auction} />
+              <AuctionCard key={auction.id} auction={auction} showStatus />
             ))}
           </div>
         )}

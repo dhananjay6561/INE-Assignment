@@ -11,4 +11,7 @@ Bid.belongsTo(Auction, { foreignKey: "auctionId", as: "auction" });
 User.hasMany(Bid, { foreignKey: "bidderId", as: "userbids" });
 Bid.belongsTo(User, { foreignKey: "bidderId", as: "bidder" });
 
+// Add seller association for auction
+Auction.belongsTo(User, { foreignKey: "sellerId", as: "seller" });
+
 module.exports = { sequelize, Auction, Bid, User, Notification };
