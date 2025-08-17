@@ -8,3 +8,4 @@ const router = express.Router();
 router.post("/:auctionId/bids", authMiddleware, placeBid);
 
 module.exports = router;
+  
