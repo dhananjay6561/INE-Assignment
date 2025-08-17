@@ -12,6 +12,7 @@ const Login = () => {
     name: ''
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
   const handleInputChange = (e) => {
     setFormData({
@@ -23,29 +24,31 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrorMsg("");
 
     try {
       let response;
       if (isLogin) {
         response = await authAPI.login(formData.email, formData.password);
+        const { token, user } = response.data;
+        // Store JWT and user data
+        localStorage.setItem('jwt_token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        notificationService.success('Login successful!');
+        navigate('/auctions');
       } else {
         response = await authAPI.signup(formData.email, formData.password, formData.name);
+        notificationService.success('Account created successfully! Please login.');
+        setIsLogin(true);
+        setFormData({ email: '', password: '', name: '' });
+        // Optionally, redirect to login page after short delay
+        setTimeout(() => {
+          navigate('/login');
+        }, 1000);
       }
-
-      const { token, user } = response.data;
-      
-      // Store JWT and user data
-      localStorage.setItem('jwt_token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      
-      notificationService.success(
-        isLogin ? 'Login successful!' : 'Account created successfully!'
-      );
-      
-      // Redirect to auctions page
-      navigate('/auctions');
     } catch (error) {
       const message = error.response?.data?.message || 'An error occurred';
+      setErrorMsg(message);
       notificationService.error(message);
     } finally {
       setIsLoading(false);
@@ -55,6 +58,7 @@ const Login = () => {
   const toggleMode = () => {
     setIsLogin(!isLogin);
     setFormData({ email: '', password: '', name: '' });
+    setErrorMsg("");
   };
 
   return (
@@ -68,8 +72,53 @@ const Login = () => {
         </div>
       </div>
 
+        {/* Demo Login Buttons */}
+        {isLogin && (
+          <div className="sm:mx-auto sm:w-full sm:max-w-md mt-6">
+            <div className="bg-white rounded-xl shadow p-6 border border-gray-100 flex flex-col items-center">
+              <div className="mb-4 text-center text-indigo-700 font-semibold text-lg tracking-wide">Login as Demo User</div>
+              <div className="flex flex-row gap-4 w-full justify-center mb-2">
+                <button
+                  type="button"
+                  className="flex-1 flex flex-col items-center justify-center py-3 px-4 rounded-lg border border-indigo-200 bg-gray-50 hover:bg-indigo-50 transition font-medium text-indigo-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 min-w-[120px]"
+                  onClick={() => setFormData({ email: 'dj@gmail.com', password: 'VASUashu2.', name: '' })}
+                >
+                  <span className="mb-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                  </span>
+                  <span className="font-bold">Seller</span>
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 flex flex-col items-center justify-center py-3 px-4 rounded-lg border border-green-200 bg-gray-50 hover:bg-green-50 transition font-medium text-green-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-green-400 min-w-[120px]"
+                  onClick={() => setFormData({ email: 'bidder1@gmail.com', password: 'bidder@123', name: '' })}
+                >
+                  <span className="mb-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 15c2.5 0 4.847.655 6.879 1.804M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  </span>
+                  <span className="font-bold">Bidder 1</span>
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 flex flex-col items-center justify-center py-3 px-4 rounded-lg border border-blue-200 bg-gray-50 hover:bg-blue-50 transition font-medium text-blue-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 min-w-[120px]"
+                  onClick={() => setFormData({ email: 'bidder2@gmail.com', password: 'bidder@246', name: '' })}
+                >
+                  <span className="mb-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 mx-auto text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14a7 7 0 00-7 7h14a7 7 0 00-7-7zM12 14v-4m0 0a4 4 0 100-8 4 4 0 000 8z" /></svg>
+                  </span>
+                  <span className="font-bold">Bidder 2</span>
+                </button>
+              </div>
+              <span className="block mt-2 text-xs text-gray-500 text-center">Select a demo user above or use your credentials</span>
+            </div>
+          </div>
+        )}
+
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          {errorMsg && (
+            <div className="mb-4 text-red-600 text-center font-medium">{errorMsg}</div>
+          )}
           <form className="space-y-6" onSubmit={handleSubmit}>
             {!isLogin && (
               <div>
