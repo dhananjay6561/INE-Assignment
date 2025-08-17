@@ -1,6 +1,62 @@
-# INEE Auction Platform Frontend
 
-A modern, real-time auction platform built with React, Vite, and Tailwind CSS. Features multi-page navigation, real-time bidding, and a sleek, responsive design.
+# INEE Auction Platform — Frontend
+
+A modern React application for real-time auctions, live bidding, notifications, and seller workflows. Built with Vite, React 19, TailwindCSS, and Socket.IO-client.
+
+## Tech Stack
+- React 19
+- Vite
+- TailwindCSS
+- React Router DOM
+- Socket.IO-client
+- Axios
+
+## Project Structure
+```
+frontend/
+├── src/
+│   ├── components/   # UI components (AuctionCard, BidInput, etc)
+│   ├── pages/        # Route pages (AuctionRoom, Auctions, Login, etc)
+│   ├── services/     # API, socket, notifications
+│   ├── App.jsx       # Main app
+│   └── main.jsx      # Entry point
+├── public/           # Static assets
+├── index.html        # HTML entry
+└── ...
+```
+
+## Setup & Development
+```bash
+cd frontend
+npm install
+npm run dev
+```
+- App runs at [http://localhost:5173](http://localhost:5173) by default
+- Configure backend API URL in `src/services/api.js` if needed
+
+## Build for Production
+```bash
+npm run build
+```
+- Output in `dist/` (served by backend in production Docker)
+
+## Environment Variables
+- (Optional) Create `.env` in `frontend/` for Vite env vars:
+   - `VITE_API_URL` — backend API base URL
+
+## Features
+- Live auction rooms with real-time bidding
+- Seller decision modal (accept/reject highest bid)
+- Notifications pane (real-time + read tracking)
+- Auth (signup/login/JWT)
+- Responsive, modern UI (TailwindCSS)
+
+## Deployment
+- In production, built assets are served by backend Express server
+- For local dev, run frontend and backend separately
+
+---
+© 2025 INEE Auction Platform
 
 ## Features
 
