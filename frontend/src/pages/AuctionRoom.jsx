@@ -31,7 +31,7 @@ const AuctionRoom = () => {
   const currentUser = getCurrentUser();
   
   const isSeller = auction?.seller?.id === currentUser.id;
-  const isAuctionEnded = auction?.status === 'ended';
+  const isAuctionEnded = auction?.status === 'ended' || auction?.status === 'decision_pending';
 
   useEffect(() => {
     if (id) {
@@ -67,9 +67,11 @@ const AuctionRoom = () => {
       setAuction(auctionData);
       
       // Check if seller needs to make a decision upon loading the page
-      if (auctionData?.seller?.id === currentUser.id && 
-          auctionData?.status === 'ended' && 
-          !auctionData?.decision) {
+      if (
+        auctionData?.seller?.id === currentUser.id &&
+        (auctionData?.status === 'ended' || auctionData?.status === 'decision_pending') &&
+        !auctionData?.decision
+      ) {
         setShowSellerModal(true);
       }
     } catch (err) {
@@ -438,7 +440,7 @@ const AuctionRoom = () => {
               </div>
             </div>
 
-            {/* Seller Actions appear only for the seller after the auction ends */}
+            {/* Seller Actions appear only for the seller after the auction ends or is decision pending */}
             {isSeller && isAuctionEnded && !auction.decision && (
               <div className="card bg-yellow-50 border-yellow-200">
                 <h3 className="text-lg font-bold text-yellow-800 mb-2">Action Required</h3>

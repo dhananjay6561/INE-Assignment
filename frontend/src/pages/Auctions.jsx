@@ -21,35 +21,66 @@ const Auctions = () => {
       setError(null);
       let response;
       if (filter === 'all') {
-        // Fetch active, scheduled, and ended auctions
-        const [activeResponse, scheduledResponse, endedResponse] = await Promise.all([
-          auctionAPI.getAll('active'),
-          auctionAPI.getAll('scheduled'),
-          auctionAPI.getAll('ended')
+            // Fetch all statuses for 'all' tab
+            const [activeResponse, scheduledResponse, endedResponse, decisionPendingResponse, acceptedResponse, rejectedResponse] = await Promise.all([
+              auctionAPI.getAll('active'),
+              auctionAPI.getAll('scheduled'),
+              auctionAPI.getAll('ended'),
+              auctionAPI.getAll('decision_pending'),
+              auctionAPI.getAll('accepted'),
+              auctionAPI.getAll('rejected')
+            ]);
+            const getAuctions = (resp) => Array.isArray(resp.data)
+              ? resp.data
+              : Array.isArray(resp.data?.auctions)
+                ? resp.data.auctions
+                : [];
+            const activeAuctions = getAuctions(activeResponse);
+            const scheduledAuctions = getAuctions(scheduledResponse);
+            const endedAuctions = getAuctions(endedResponse);
+            const decisionPendingAuctions = getAuctions(decisionPendingResponse);
+            const acceptedAuctions = getAuctions(acceptedResponse);
+            const rejectedAuctions = getAuctions(rejectedResponse);
+            const combinedAuctions = [
+              ...activeAuctions,
+              ...scheduledAuctions,
+              ...endedAuctions,
+              ...decisionPendingAuctions,
+              ...acceptedAuctions,
+              ...rejectedAuctions
+            ];
+            // Sort: active > scheduled > ended > decision_pending > accepted > rejected, then by end/start time
+            const statusOrder = { active: 0, scheduled: 1, ended: 2, decision_pending: 3, accepted: 4, rejected: 5 };
+            combinedAuctions.sort((a, b) => {
+              if (statusOrder[a.status] !== statusOrder[b.status]) {
+                return statusOrder[a.status] - statusOrder[b.status];
+              }
+              return new Date(a.endTime || a.startTime) - new Date(b.endTime || b.startTime);
+            });
+            setAuctions(combinedAuctions);
+      } else if (filter === 'ended') {
+        // Show ended, accepted, and rejected auctions in the 'ended' tab
+        const [endedResponse, acceptedResponse, rejectedResponse] = await Promise.all([
+          auctionAPI.getAll('ended'),
+          auctionAPI.getAll('accepted'),
+          auctionAPI.getAll('rejected')
         ]);
-        const activeAuctions = Array.isArray(activeResponse.data)
-          ? activeResponse.data
-          : Array.isArray(activeResponse.data?.auctions)
-            ? activeResponse.data.auctions
+        const getAuctions = (resp) => Array.isArray(resp.data)
+          ? resp.data
+          : Array.isArray(resp.data?.auctions)
+            ? resp.data.auctions
             : [];
-        const scheduledAuctions = Array.isArray(scheduledResponse.data)
-          ? scheduledResponse.data
-          : Array.isArray(scheduledResponse.data?.auctions)
-            ? scheduledResponse.data.auctions
-            : [];
-        const endedAuctions = Array.isArray(endedResponse.data)
-          ? endedResponse.data
-          : Array.isArray(endedResponse.data?.auctions)
-            ? endedResponse.data.auctions
-            : [];
+        const endedAuctions = getAuctions(endedResponse);
+        const acceptedAuctions = getAuctions(acceptedResponse);
+        const rejectedAuctions = getAuctions(rejectedResponse);
         const combinedAuctions = [
-          ...activeAuctions,
-          ...scheduledAuctions,
-          ...endedAuctions
+          ...endedAuctions,
+          ...acceptedAuctions,
+          ...rejectedAuctions
         ];
-        // Sort: active > scheduled > ended, then by end/start time
+        // Sort: ended > accepted > rejected, then by end/start time
+        const statusOrder = { ended: 0, accepted: 1, rejected: 2 };
         combinedAuctions.sort((a, b) => {
-          const statusOrder = { active: 0, scheduled: 1, ended: 2 };
           if (statusOrder[a.status] !== statusOrder[b.status]) {
             return statusOrder[a.status] - statusOrder[b.status];
           }
@@ -134,7 +165,8 @@ const Auctions = () => {
                 { key: 'all', label: 'All Auctions' },
                 { key: 'active', label: 'Active' },
                 { key: 'scheduled', label: 'Scheduled' },
-                { key: 'ended', label: 'Ended' }
+                { key: 'ended', label: 'Ended' },
+                { key: 'decision_pending', label: 'Decision Pending' }
               ].map((tab) => (
                 <button
                   key={tab.key}
