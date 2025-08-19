@@ -1,6 +1,7 @@
 const Auction = require("../models/Auction");
 const { Op } = require("sequelize");
 const redis = require("../config/redis"); // Redis client
+const { User, Bid } = require("../models");
 
 // Create auction
 exports.createAuction = async (req, res) => {
@@ -95,8 +96,8 @@ exports.getAuction = async (req, res) => {
       status: auction.status,
       created_at: auction.created_at,
       updated_at: auction.updated_at,
-      currentHighestBid: highest ? highest.amount : null,
-      currentHighestBidder: highestBidder || null,
+      currentHighestBid: highest ? highest.amount : auction.finalPrice || null,
+      currentHighestBidder: highestBidder || (auction.winnerId ? await User.findByPk(auction.winnerId, { attributes: ['id','name','email'] }) : null),
       endTime,
       bidCount,
     };

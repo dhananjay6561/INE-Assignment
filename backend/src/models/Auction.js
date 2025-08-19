@@ -48,6 +48,14 @@ const Auction = sequelize.define("Auction", {
     ),
     defaultValue: "scheduled",
   },
+  winnerId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+  },
+  finalPrice: {
+    type: DataTypes.FLOAT,
+    allowNull: true,
+  },
 }, {
   tableName: "auctions",
   timestamps: true,

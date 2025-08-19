@@ -42,7 +42,10 @@ exports.sellerDecision = async (req, res) => {
 
     if (action === "accept") {
       auction.status = "accepted";
+      auction.winnerId = highest.bidderId;
+      auction.finalPrice = highest.amount;
       await auction.save();
+
       // persist status to Redis and cleanup highest bid
       try { await redis.set(`auction:${auctionId}:status`, auction.status); } catch (e) { console.error('Failed to set redis status', e); }
       try { await redis.del(`auction:${auctionId}:highest`); } catch (e) { /* non-fatal */ }
