@@ -4,6 +4,7 @@ import { auctionAPI } from '../services/api';
 import notificationService from '../services/notifications';
 import AuctionCard from '../components/AuctionCard';
 import NotificationsPane from '../components/NotificationsPane';
+import Navbar from '../components/Navbar';
 
 const Auctions = () => {
   const [auctions, setAuctions] = useState([]);
@@ -133,34 +134,15 @@ const Auctions = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-indigo-600">INEE Auctions</h1>
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-700">Welcome, {user.name}</span>
-              <Link to="/create-auction" className="btn-primary">
-                Create Auction
-              </Link>
-              <NotificationsPane />
-              <button onClick={handleLogout} className="btn-secondary">
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      {/* Reuse shared Navbar which contains responsive actions */}
+      <Navbar />
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filter Tabs */}
+        {/* Filter Tabs: make horizontally scrollable on small screens to avoid overflow */}
         <div className="mb-8">
           <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
+            <nav className="-mb-px flex flex-nowrap space-x-4 sm:space-x-8 px-2 overflow-x-auto">
               {[
                 { key: 'all', label: 'All Auctions' },
                 { key: 'active', label: 'Active' },
@@ -171,7 +153,7 @@ const Auctions = () => {
                 <button
                   key={tab.key}
                   onClick={() => setFilter(tab.key)}
-                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  className={`py-2 px-3 sm:px-1 border-b-2 font-medium text-sm min-w-max ${
                     filter === tab.key
                       ? 'border-indigo-500 text-indigo-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'

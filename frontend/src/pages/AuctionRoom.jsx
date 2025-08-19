@@ -16,6 +16,7 @@ const AuctionRoom = () => {
   const [isPlacingBid, setIsPlacingBid] = useState(false);
   const [showSellerModal, setShowSellerModal] = useState(false);
   const [isMakingDecision, setIsMakingDecision] = useState(false);
+  const [winnerName, setWinnerName] = useState(null);
 
   // Get current user with error handling
   const getCurrentUser = () => {
@@ -65,6 +66,12 @@ const AuctionRoom = () => {
       }
       
       setAuction(auctionData);
+      // Derive winner name from fetched data if already accepted
+      if (auctionData?.status === 'accepted') {
+        setWinnerName(auctionData?.currentHighestBidder?.name || null);
+      } else if (auctionData?.status === 'rejected' || auctionData?.status === 'closed_no_winner') {
+        setWinnerName(null);
+      }
       
       // Check if seller needs to make a decision upon loading the page
       if (
@@ -175,6 +182,12 @@ const AuctionRoom = () => {
         if (!data) return;
         if (String(data.auctionId) === String(id)) {
           setAuction(prev => ({ ...prev, decision: data.decision }));
+          // Capture winner name locally on acceptance, otherwise clear
+          if (data.decision === 'accepted') {
+            setWinnerName((prevName) => prevName || auction?.currentHighestBidder?.name || null);
+          } else {
+            setWinnerName(null);
+          }
           notificationService.info(`Seller has ${data.decision}ed the final bid.`);
           // Add a persistent inbox notification for the bidder if this client is the bidder
           const currentUserId = currentUser?.id;
@@ -425,6 +438,17 @@ const AuctionRoom = () => {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Ends:</span>
                   <span className="text-gray-900 text-sm">{formatDate(auction.endTime)}</span>
+                </div>
+
+                <div className="flex justify-between items-center border-t pt-3 mt-3">
+                  <span className="text-gray-600">Winner:</span>
+                  <span className="text-gray-900 text-sm">
+                    {auction.status === 'rejected' || auction.status === 'closed_no_winner'
+                      ? 'No Winner'
+                      : auction.status === 'accepted'
+                        ? (winnerName || auction.currentHighestBidder?.name || 'Winner')
+                        : 'To be Decided'}
+                  </span>
                 </div>
 
                 {auction.decision && (
