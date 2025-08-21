@@ -6,7 +6,7 @@ class SocketService {
     this.connected = false;
     this.currentRoom = null;
   this.pendingRoom = null;
-  this._listeners = {}; // map event -> array of wrappers
+  this._listeners = {}; 
   }
 
   // Initialize socket connection
@@ -15,7 +15,7 @@ class SocketService {
       this.disconnect();
     }
 
-    this.socket = io('http://localhost:5000', {
+    this.socket = io('https://ineback-1.onrender.com', {
       auth: {
         token: token
       },
